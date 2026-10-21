@@ -14,21 +14,22 @@ const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
+  'https://fasco-xi.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
-].filter(Boolean);
+]
+  .filter(Boolean)
+  .flatMap((origins) => origins.split(/[,\n]/))
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, true); // allow Vite alternate ports in local dev
-      }
+      callback(null, !origin || allowedOrigins.includes(origin.replace(/\/+$/, '')));
     },
     credentials: true,
   })

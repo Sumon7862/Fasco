@@ -23,7 +23,7 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <ScrollToHash />
-      {!isAuth && <Navbar />}
+      <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />

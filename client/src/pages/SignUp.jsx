@@ -33,7 +33,10 @@ export default function SignUp() {
       await register(form);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(
+        err.response?.data?.message ||
+          'Could not connect to the server. Check the VITE_API_URL and backend CORS settings.',
+      );
     } finally {
       setLoading(false);
     }
