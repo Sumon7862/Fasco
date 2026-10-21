@@ -41,37 +41,29 @@ function mapApiCart(cart = []) {
   );
 }
 
+function getRequestErrorMessage(error, fallback) {
+  return error.response?.data?.message || fallback;
+}
+
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const [items, setItems] = useState(loadCartFromStorage);
+  const [cartError, setCartError] = useState('');
 
   useEffect(() => {
     localStorage.setItem(CART_KEY, JSON.stringify(items));
   }, [items]);
-
-  const syncAddToApi = useCallback(async (item) => {
-    if (!isAuthenticated) return;
-    try {
-      await api.post('/cart', {
-        productId: item.productId,
-        quantity: item.quantity,
-        size: item.size,
-        color: item.color,
-      });
-    } catch {
-      /* local cart remains source of truth when offline or unauthenticated */
-    }
-  }, [isAuthenticated]);
 
   const syncCartFromApi = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
       const { data } = await api.get('/cart');
       setItems(mapApiCart(data.cart));
-    } catch {
-      /* keep local cart */
+      setCartError('');
+    } catch (error) {
+      setCartError(getRequestErrorMessage(error, 'Could not load your saved cart.'));
     }
   }, [isAuthenticated]);
 
@@ -80,8 +72,26 @@ export function CartProvider({ children }) {
   }, [syncCartFromApi]);
 
   const addItem = useCallback(
-    (item) => {
+    async (item) => {
       const normalized = normalizeLineItem(item);
+      setCartError('');
+
+      if (isAuthenticated) {
+        try {
+          const { data } = await api.post('/cart', {
+            productId: normalized.productId,
+            quantity: normalized.quantity,
+            size: normalized.size,
+            color: normalized.color,
+          });
+          setItems(mapApiCart(data.cart));
+          return true;
+        } catch (error) {
+          setCartError(getRequestErrorMessage(error, 'Could not add this item to your cart.'));
+          return false;
+        }
+      }
+
       setItems((prev) => {
         const idx = prev.findIndex(
           (line) =>
@@ -95,26 +105,28 @@ export function CartProvider({ children }) {
             ...next[idx],
             quantity: next[idx].quantity + normalized.quantity,
           };
-          syncAddToApi(next[idx]);
           return next;
         }
-        syncAddToApi(normalized);
         return [...prev, { ...normalized, id: normalized.id ?? crypto.randomUUID() }];
       });
+      return true;
     },
-    [syncAddToApi],
+    [isAuthenticated],
   );
 
   const removeItem = useCallback(
     async (id) => {
-      setItems((prev) => prev.filter((line) => line.id !== id));
       if (isAuthenticated) {
         try {
-          await api.delete(`/cart/${id}`);
-        } catch {
-          /* ignore */
+          const { data } = await api.delete(`/cart/${id}`);
+          setItems(mapApiCart(data.cart));
+          setCartError('');
+        } catch (error) {
+          setCartError(getRequestErrorMessage(error, 'Could not remove this item.'));
         }
+        return;
       }
+      setItems((prev) => prev.filter((line) => line.id !== id));
     },
     [isAuthenticated],
   );
@@ -122,27 +134,31 @@ export function CartProvider({ children }) {
   const updateQty = useCallback(
     async (id, quantity) => {
       const qty = Math.max(1, quantity);
+      if (isAuthenticated) {
+        try {
+          const { data } = await api.put(`/cart/${id}`, { quantity: qty });
+          setItems(mapApiCart(data.cart));
+          setCartError('');
+        } catch (error) {
+          setCartError(getRequestErrorMessage(error, 'Could not update this item.'));
+        }
+        return;
+      }
       setItems((prev) =>
         prev.map((line) => (line.id === id ? { ...line, quantity: qty } : line)),
       );
-      if (isAuthenticated) {
-        try {
-          await api.put(`/cart/${id}`, { quantity: qty });
-        } catch {
-          /* ignore */
-        }
-      }
     },
     [isAuthenticated],
   );
 
   const clear = useCallback(async () => {
     setItems([]);
+    setCartError('');
     if (isAuthenticated) {
       try {
         await api.delete('/cart');
-      } catch {
-        /* ignore */
+      } catch (error) {
+        setCartError(getRequestErrorMessage(error, 'Could not clear your saved cart.'));
       }
     }
   }, [isAuthenticated]);
@@ -159,10 +175,12 @@ export function CartProvider({ children }) {
       removeItem,
       updateQty,
       clear,
+      cartError,
+      clearCartError: () => setCartError(''),
       subtotal,
       itemCount: items.reduce((n, line) => n + line.quantity, 0),
     }),
-    [items, addItem, removeItem, updateQty, clear, subtotal],
+    [items, addItem, removeItem, updateQty, clear, cartError, subtotal],
   );
 
   return (

@@ -83,10 +83,14 @@ custom domain).
 
 ### 3. Seed the database
 
-Run `npm run seed` from the `server` directory with `MONGO_URI` set to the
-production database. This creates the demo products and admin account
-(`admin@fasco.com` / `Admin@123`); change or remove the demo account before
-using the site publicly.
+If `/api/products` returns an empty list, the storefront will show an empty
+catalog. Run `npm run seed` from the `server` directory with `MONGO_URI` set to
+the production database (for example, in a secure shell with the Render
+environment configured). The seed script creates or updates the demo products
+by slug without deleting other catalog entries. It also creates the demo admin
+(`admin@fasco.com` / `Admin@123`) if missing; change or remove that account
+before using the site publicly. Do not run the seed command as every deploy's
+build or start command.
 
 > **Important:** `server/.env` is currently tracked in this repository. If it
 > contains real credentials, rotate them, remove the file from Git tracking and

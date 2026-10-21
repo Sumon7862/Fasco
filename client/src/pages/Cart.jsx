@@ -4,7 +4,7 @@ import SafeImage from '../components/SafeImage';
 import { useCart } from '../context/CartContext';
 
 export default function Cart() {
-  const { items, removeItem, updateQty, subtotal } = useCart();
+  const { items, removeItem, updateQty, subtotal, cartError } = useCart();
 
   return (
     <main>
@@ -17,6 +17,7 @@ export default function Cart() {
           <span className="text-fasco-black">Shopping Cart</span>
         </nav>
         <h1 className="mt-4 font-serif text-4xl text-fasco-black">Shopping Cart</h1>
+        {cartError && <p role="alert" className="mt-4 text-sm text-red-500">{cartError}</p>}
 
         {items.length === 0 ? (
           <div className="mt-16 text-center">

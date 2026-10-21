@@ -319,8 +319,15 @@ async function seed() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('Connected to MongoDB');
 
-    await Product.deleteMany({});
-    await Product.insertMany(products);
+    await Product.bulkWrite(
+      products.map((product) => ({
+        updateOne: {
+          filter: { slug: product.slug },
+          update: { $set: product },
+          upsert: true,
+        },
+      })),
+    );
     console.log(`Seeded ${products.length} products with local images`);
 
     const adminEmail = 'admin@fasco.com';

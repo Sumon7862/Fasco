@@ -1,22 +1,42 @@
 import { useEffect, useState } from 'react';
-
-function getParts(target) {
-  const diff = Math.max(0, target - Date.now());
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-  const minutes = Math.floor((diff / (1000 * 60)) % 60);
-  const seconds = Math.floor((diff / 1000) % 60);
-  return { days, hours, minutes, seconds };
-}
+import { getCountdownParts, getNextMonthStart } from '../utils/countdown';
 
 export default function Countdown({ endDate }) {
-  const target = endDate ? new Date(endDate).getTime() : Date.now() + 1000 * 60 * 60 * 24 * 3 + 1000 * 60 * 60 * 10;
-  const [parts, setParts] = useState(() => getParts(target));
+  const [defaultTarget, setDefaultTarget] = useState(getNextMonthStart);
+  const usesDefaultTarget = endDate == null;
+  const target = usesDefaultTarget ? defaultTarget : new Date(endDate).getTime();
+  const [parts, setParts] = useState(null);
 
   useEffect(() => {
-    const id = setInterval(() => setParts(getParts(target)), 1000);
+    const update = () => {
+      if (usesDefaultTarget && target <= Date.now()) {
+        setDefaultTarget(getNextMonthStart());
+        return;
+      }
+      setParts(getCountdownParts(target));
+    };
+    update();
+    if (!Number.isFinite(target)) return undefined;
+
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [target]);
+  }, [target, usesDefaultTarget]);
+
+  if (!parts) {
+    return (
+      <p role="status" className="text-sm text-fasco-muted">
+        Countdown unavailable
+      </p>
+    );
+  }
+
+  if (parts.expired) {
+    return (
+      <p role="status" className="text-sm text-fasco-muted">
+        Offer has ended
+      </p>
+    );
+  }
 
   const cells = [
     { label: 'Days', value: parts.days },

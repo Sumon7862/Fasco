@@ -19,26 +19,49 @@ export default function ProductDetail() {
   const [color, setColor] = useState(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+  const [loadedSlug, setLoadedSlug] = useState(null);
+  const loading = loadedSlug !== slug;
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const { data } = await api.get(`/products/${slug}`);
         const p = data.product || data;
+        if (cancelled) return;
         setProduct(p);
         setSize(p.sizes?.[0] || '');
         setColor(p.colors?.[0] || null);
         setActiveImg(0);
-        const rel = await api.get(`/products?limit=4&category=${p.category}`);
-        setRelated((rel.data.products || []).filter((x) => x.slug !== p.slug).slice(0, 4));
-      } catch {
+        setLoadedSlug(slug);
+
+        try {
+          const rel = await api.get(`/products?limit=4&category=${p.category}`);
+          if (!cancelled) {
+            setRelated((rel.data.products || []).filter((x) => x.slug !== p.slug).slice(0, 4));
+          }
+        } catch {
+          if (!cancelled) setRelated([]);
+        }
+      } catch (requestError) {
+        if (cancelled) return;
         setProduct(null);
+        setError(
+          requestError.response?.status === 404
+            ? 'Product not found.'
+            : 'Could not load this product. Please try again.',
+        );
+        setLoadedSlug(slug);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
-  if (!product) {
+  if (loading) {
     return (
       <main className="container-fasco py-20 text-center text-sm text-fasco-muted">
         Loading product...
@@ -46,24 +69,48 @@ export default function ProductDetail() {
     );
   }
 
-  const onAdd = () => {
+  if (!product) {
+    return (
+      <main className="container-fasco py-20 text-center">
+        <p className="text-sm text-fasco-muted">{error}</p>
+        <Link to="/shop" className="btn-primary mt-6 inline-block w-auto px-10">
+          Back to Shop
+        </Link>
+      </main>
+    );
+  }
+
+  const onAdd = async () => {
     if (!size) {
       setError('Please select a size');
       return;
     }
+    if (!color?.name) {
+      setError('Please select a color');
+      return;
+    }
     setError('');
-    addItem({
-      productId: product._id,
-      product,
-      quantity: qty,
-      size,
-      color: color?.name,
-      price: product.price,
-      title: product.title,
-      image: product.images?.[0],
-    });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    setAdding(true);
+    try {
+      const success = await addItem({
+        productId: product._id,
+        product,
+        quantity: qty,
+        size,
+        color: color.name,
+        price: product.price,
+        title: product.title,
+        image: product.images?.[0],
+      });
+      if (!success) {
+        setError('Could not add this item to your cart. Please try again.');
+        return;
+      }
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2000);
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -177,8 +224,8 @@ export default function ProductDetail() {
                   +
                 </button>
               </div>
-              <button type="button" onClick={onAdd} className="btn-primary flex-1 scroll-mt-28">
-                {added ? 'Added!' : 'Add to cart'}
+              <button type="button" onClick={onAdd} disabled={adding} className="btn-primary flex-1 scroll-mt-28">
+                {adding ? 'Adding...' : added ? 'Added!' : 'Add to cart'}
               </button>
             </div>
             {error && <p className="mt-2 text-sm text-red-500">{error}</p>}

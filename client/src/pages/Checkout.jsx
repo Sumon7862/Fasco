@@ -11,6 +11,7 @@ export default function Checkout() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [discountCode, setDiscountCode] = useState('');
+  const [appliedDiscountCode, setAppliedDiscountCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +31,7 @@ export default function Checkout() {
     cardholderName: '',
   });
 
-  const shipping = subtotal > 100 ? 0 : 12;
+  const shipping = subtotal - discount > 100 ? 0 : 12;
   const total = Math.max(0, subtotal - discount + shipping);
 
   const onChange = (e) => {
@@ -42,12 +43,15 @@ export default function Checkout() {
     const code = discountCode.trim().toUpperCase();
     if (code === 'FASCO10') {
       setDiscount(subtotal * 0.1);
+      setAppliedDiscountCode(code);
       setError('');
     } else if (code === 'WELCOME15') {
       setDiscount(subtotal * 0.15);
+      setAppliedDiscountCode(code);
       setError('');
     } else {
       setDiscount(0);
+      setAppliedDiscountCode('');
       setError('Invalid discount code');
     }
   };
@@ -90,7 +94,7 @@ export default function Checkout() {
             securityCode: form.securityCode,
             cardholderName: form.cardholderName,
           },
-          discountCode: discountCode || undefined,
+          discountCode: appliedDiscountCode || undefined,
         });
         await clear();
         navigate('/thank-you', { state: { orderId: data.order?._id || data._id } });
@@ -229,7 +233,11 @@ export default function Checkout() {
             <div className="mt-6 flex gap-2">
               <input
                 value={discountCode}
-                onChange={(e) => setDiscountCode(e.target.value)}
+                onChange={(e) => {
+                  setDiscountCode(e.target.value);
+                  setAppliedDiscountCode('');
+                  setDiscount(0);
+                }}
                 placeholder="Discount code"
                 className="input-underline flex-1"
               />
