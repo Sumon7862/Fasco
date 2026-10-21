@@ -5,6 +5,7 @@ import Newsletter from '../components/Newsletter';
 import ProductCard from '../components/ProductCard';
 import PromoBanner from '../components/PromoBanner';
 import SafeImage from '../components/SafeImage';
+import { getDemoCatalog } from '../utils/catalog';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL'];
 const COLORS = [
@@ -23,6 +24,7 @@ export default function Shop() {
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
   const [size, setSize] = useState('');
@@ -32,6 +34,7 @@ export default function Shop() {
   const q = searchParams.get('q') || '';
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true);
       try {
@@ -46,14 +49,54 @@ export default function Shop() {
         if (tag) params.set('tag', tag);
         if (q) params.set('q', q);
         const { data } = await api.get(`/products?${params}`);
-        setProducts(data.products || []);
-        setTotal(data.pagination?.total ?? data.total ?? data.products?.length ?? 0);
+        const total = data.pagination?.total ?? data.total ?? data.products?.length ?? 0;
+        if (total > 0) {
+          if (!cancelled) {
+            setProducts(data.products || []);
+            setTotal(total);
+            setDemoMode(Boolean(data.products?.some((product) => product.isDemo)));
+          }
+          return;
+        }
+
+        const hasFilters = Boolean(size || color || category || tag || q);
+        if (hasFilters) {
+          const { data: catalogData } = await api.get('/products?limit=1');
+          const catalogTotal =
+            catalogData.pagination?.total ??
+            catalogData.total ??
+            catalogData.products?.length ??
+            0;
+          if (catalogTotal > 0) {
+            if (!cancelled) {
+              setProducts([]);
+              setTotal(0);
+              setDemoMode(false);
+            }
+            return;
+          }
+        }
+
+        const demo = getDemoCatalog({ page, limit: 9, sort, size, color, category, tag, q });
+        if (!cancelled) {
+          setProducts(demo.products);
+          setTotal(demo.total);
+          setDemoMode(true);
+        }
       } catch {
-        setProducts([]);
+        const demo = getDemoCatalog({ page, limit: 9, sort, size, color, category, tag, q });
+        if (!cancelled) {
+          setProducts(demo.products);
+          setTotal(demo.total);
+          setDemoMode(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [page, sort, size, color, category, tag, q]);
 
   const pages = useMemo(() => Math.max(1, Math.ceil(total / 9)), [total]);
@@ -196,6 +239,11 @@ export default function Shop() {
                 <option value="rating">Top Rated</option>
               </select>
             </div>
+            {demoMode && (
+              <p className="mb-4 text-xs text-fasco-muted">
+                Showing the built-in demo catalog because the database has no products yet.
+              </p>
+            )}
 
             {loading ? (
               <p className="text-sm text-fasco-muted">Loading products...</p>

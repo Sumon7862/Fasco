@@ -9,6 +9,7 @@ import Newsletter from '../components/Newsletter';
 import ProductCard from '../components/ProductCard';
 import PromoBanner from '../components/PromoBanner';
 import SafeImage from '../components/SafeImage';
+import { DEMO_PRODUCTS } from '../utils/catalog';
 
 const heroImgs = ['/images/home/hero-1.jpg', '/images/home/hero-2.jpg', '/images/home/hero-3.jpg'];
 
@@ -58,6 +59,7 @@ export default function Home() {
   const [dealIndex, setDealIndex] = useState(0);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [error, setError] = useState('');
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,18 +70,34 @@ export default function Home() {
           api.get('/products/new-arrivals'),
         ]);
         if (cancelled) return;
-        setDeals(d.data.products || []);
-        setArrivals(a.data.products || []);
+        const apiArrivals = a.data.products || [];
+        const catalog = apiArrivals.length ? apiArrivals : DEMO_PRODUCTS;
+        setDemoMode(!apiArrivals.length || Boolean(apiArrivals[0]?.isDemo));
+        setDeals(
+          (d.data.products || []).length
+            ? d.data.products
+            : catalog.filter((product) => product.dealOfMonth).slice(0, 6),
+        );
+        setArrivals(catalog);
         setError('');
       } catch {
         try {
-          const { data } = await api.get('/products?limit=12');
+          const { data } = await api.get('/products?limit=50');
           if (cancelled) return;
-          const list = data.products || [];
-          setDeals(list.filter((p) => p.dealOfMonth).slice(0, 6) || list.slice(0, 3));
+          const list = data.products?.length ? data.products : DEMO_PRODUCTS;
+          setDemoMode(
+            !data.products?.length || Boolean(data.products[0]?.isDemo),
+          );
+          setDeals(list.filter((product) => product.dealOfMonth).slice(0, 6));
           setArrivals(list);
+          setError('');
         } catch {
-          if (!cancelled) setError('Could not load products. Is the API running on port 5000?');
+          if (!cancelled) {
+            setDeals(DEMO_PRODUCTS.filter((product) => product.dealOfMonth).slice(0, 6));
+            setArrivals(DEMO_PRODUCTS);
+            setDemoMode(true);
+            setError('');
+          }
         }
       }
     })();
@@ -136,9 +154,13 @@ export default function Home() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <h2 className="section-title">Deals Of The Month</h2>
+            {demoMode && (
+              <p className="mt-2 text-xs text-fasco-muted">
+                Showing the built-in demo catalog.
+              </p>
+            )}
             <p className="mt-4 max-w-md text-sm leading-relaxed text-fasco-muted">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Scelerisque duis ultrices sollicitudin aliquam
-              sem. Scelerisque duis ultrices sollicitudin
+              Explore this month&apos;s most-loved pieces, selected for standout style and everyday versatility.
             </p>
             <Link to="/shop" className="btn-primary mt-6 w-fit px-10">
               Buy Now
@@ -185,8 +207,7 @@ export default function Home() {
         <div className="text-center">
           <h2 className="section-title">New Arrivals</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm text-fasco-muted">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Scelerisque duis ultrices sollicitudin aliquam sem.
-            Scelerisque duis ultrices sollicitudin
+            Fresh wardrobe staples and new-season favorites, selected to make everyday dressing feel effortless.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-2">
             {categories.map((c) => (
@@ -206,9 +227,14 @@ export default function Home() {
           </div>
         </div>
         <div className="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 md:gap-8 lg:grid-cols-4">
-          {(filtered.length ? filtered : arrivals).slice(0, 8).map((p) => (
+          {filtered.slice(0, 8).map((p) => (
             <ProductCard key={p._id || p.slug} product={p} />
           ))}
+          {!filtered.length && (
+            <p className="col-span-full py-10 text-sm text-fasco-muted">
+              No products in this collection yet. Explore the full shop for more styles.
+            </p>
+          )}
         </div>
         <div className="mt-12 text-center">
           <Link to="/shop" className="btn-primary inline-block w-auto px-12">
@@ -224,8 +250,7 @@ export default function Home() {
       <section className="container-fasco my-16 text-center md:my-20">
         <h2 className="section-title">Follow Us On Instagram</h2>
         <p className="mx-auto mt-3 max-w-lg text-sm text-fasco-muted">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Scelerisque duis ultrices sollicitudin aliquam sem.
-          Scelerisque duis ultrices sollicitudin
+          A little inspiration from the FASCO community, featuring new looks and everyday favorites.
         </p>
         <div className="mt-10 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7 md:gap-3">
           {igImgs.map((src) => (
@@ -241,7 +266,7 @@ export default function Home() {
         <div className="text-center">
           <h2 className="section-title">This Is What Our Customers Say</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm text-fasco-muted">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Scelerisque duis
+            Real style is personal. Here are a few notes from shoppers who made FASCO part of their wardrobe.
           </p>
         </div>
         <div className="relative mx-auto mt-12 max-w-xl rounded-lg bg-white p-8 shadow-[0_16px_48px_rgba(0,0,0,0.1)]">

@@ -11,7 +11,11 @@ export default function ThankYou() {
       </div>
       <h1 className="font-serif text-4xl text-fasco-black">Thank You!</h1>
       <p className="mt-4 max-w-md text-sm text-fasco-muted">
-        Your order has been placed successfully. We&apos;ll send a confirmation email shortly.
+        {state?.demo
+          ? 'Your demo order is complete. No payment was taken and nothing was saved to the live database.'
+          : state?.guest
+            ? 'Your demo order is complete. Sign in is required to save orders to your account.'
+            : 'Your order has been placed successfully. We’ll send a confirmation email shortly.'}
       </p>
       {orderId && (
         <p className="mt-4 text-sm text-fasco-black">

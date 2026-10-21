@@ -83,11 +83,18 @@ custom domain).
 
 ### 3. Seed the database
 
-If `/api/products` returns an empty list, the storefront will show an empty
-catalog. Run `npm run seed` from the `server` directory with `MONGO_URI` set to
-the production database (for example, in a secure shell with the Render
-environment configured). The seed script creates or updates the demo products
-by slug without deleting other catalog entries. It also creates the demo admin
+The project includes a shared 14-product demo catalog with matching local
+images. The API serves that catalog when the database has no products, so the
+storefront, category filters, deals, arrivals, and product pages remain
+browsable before seeding. Demo catalog cart/checkout is local-only and does
+not charge a payment method or create a database order. Newsletter signups are
+stored in MongoDB and duplicate email submissions are reported.
+
+To enable persistent product inventory and real account orders, run
+`npm run seed` from the `server` directory with `MONGO_URI` set to the target
+database (for example, in a secure shell with the Render environment
+configured). The seed script creates or updates the demo products by slug
+without deleting other catalog entries. It also creates the demo admin
 (`admin@fasco.com` / `Admin@123`) if missing; change or remove that account
 before using the site publicly. Do not run the seed command as every deploy's
 build or start command.
@@ -102,4 +109,6 @@ build or start command.
 
 - Auth: Sign In, Sign Up, Forgot Password → OTP → New Password
 - Home, Shop (filters/sort), Product Detail, Cart, Checkout, Thank You
-- JWT auth, cart (local + server), orders, discount codes `FASCO10` / `WELCOME15`
+- JWT auth, cart (local + server), orders, newsletter subscriptions, discount
+  codes `FASCO10` / `WELCOME15`
+- Tests: run `npm test` from the repository root

@@ -60,7 +60,10 @@ export function CartProvider({ children }) {
     if (!isAuthenticated) return;
     try {
       const { data } = await api.get('/cart');
-      setItems(mapApiCart(data.cart));
+      setItems((previous) => [
+        ...previous.filter((item) => item.isDemo),
+        ...mapApiCart(data.cart),
+      ]);
       setCartError('');
     } catch (error) {
       setCartError(getRequestErrorMessage(error, 'Could not load your saved cart.'));
@@ -76,7 +79,7 @@ export function CartProvider({ children }) {
       const normalized = normalizeLineItem(item);
       setCartError('');
 
-      if (isAuthenticated) {
+      if (isAuthenticated && !normalized.product?.isDemo) {
         try {
           const { data } = await api.post('/cart', {
             productId: normalized.productId,
@@ -107,7 +110,10 @@ export function CartProvider({ children }) {
           };
           return next;
         }
-        return [...prev, { ...normalized, id: normalized.id ?? crypto.randomUUID() }];
+        const id = normalized.product?.isDemo
+          ? `demo-cart:${normalized.product.slug}:${normalized.size}:${normalized.color}`
+          : normalized.id ?? crypto.randomUUID();
+        return [...prev, { ...normalized, id, isDemo: Boolean(normalized.product?.isDemo) }];
       });
       return true;
     },
@@ -116,7 +122,7 @@ export function CartProvider({ children }) {
 
   const removeItem = useCallback(
     async (id) => {
-      if (isAuthenticated) {
+      if (isAuthenticated && !String(id).startsWith('demo-cart:')) {
         try {
           const { data } = await api.delete(`/cart/${id}`);
           setItems(mapApiCart(data.cart));
@@ -134,7 +140,7 @@ export function CartProvider({ children }) {
   const updateQty = useCallback(
     async (id, quantity) => {
       const qty = Math.max(1, quantity);
-      if (isAuthenticated) {
+      if (isAuthenticated && !String(id).startsWith('demo-cart:')) {
         try {
           const { data } = await api.put(`/cart/${id}`, { quantity: qty });
           setItems(mapApiCart(data.cart));

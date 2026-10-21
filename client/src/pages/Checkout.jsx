@@ -65,7 +65,8 @@ export default function Checkout() {
     setLoading(true);
     setError('');
     try {
-      if (isAuthenticated) {
+      const demoOrder = items.some((item) => item.isDemo);
+      if (isAuthenticated && !demoOrder) {
         // Sync local cart to server before placing order
         await api.delete('/cart').catch(() => {});
         for (const item of items) {
@@ -99,10 +100,13 @@ export default function Checkout() {
         await clear();
         navigate('/thank-you', { state: { orderId: data.order?._id || data._id } });
       } else {
-        // Guest checkout — simulate order locally
         await clear();
         navigate('/thank-you', {
-          state: { orderId: `GUEST-${Date.now().toString(36).toUpperCase()}`, guest: true },
+          state: {
+            orderId: `DEMO-${Date.now().toString(36).toUpperCase()}`,
+            guest: !isAuthenticated,
+            demo: true,
+          },
         });
       }
     } catch (err) {
@@ -127,6 +131,11 @@ export default function Checkout() {
     <main>
       <div className="container-fasco py-8 md:py-12">
         <h1 className="font-serif text-3xl text-fasco-black md:text-4xl">FASCO Demo Checkout</h1>
+        {items.some((item) => item.isDemo) && (
+          <p className="mt-3 text-sm text-fasco-muted">
+            Demo catalog checkout: no payment will be charged and this order will not be saved to the live database.
+          </p>
+        )}
 
         <form onSubmit={onSubmit} className="mt-10 grid gap-12 lg:grid-cols-[1fr_380px]">
           <div className="space-y-10">

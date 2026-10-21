@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { Heart, Share2, Star } from 'lucide-react';
 import api from '../api/axios';
 import Countdown from '../components/Countdown';
@@ -8,9 +8,12 @@ import ProductCard from '../components/ProductCard';
 import PromoBanner from '../components/PromoBanner';
 import SafeImage from '../components/SafeImage';
 import { useCart } from '../context/CartContext';
+import { DEMO_PRODUCTS, getDemoProduct } from '../utils/catalog';
 
 export default function ProductDetail() {
   const { slug } = useParams();
+  const { state: navigationState } = useLocation();
+  const requestedSize = navigationState?.size;
   const { addItem } = useCart();
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
@@ -29,37 +32,86 @@ export default function ProductDetail() {
     (async () => {
       try {
         const { data } = await api.get(`/products/${slug}`);
-        const p = data.product || data;
+        const p = data.product || data || getDemoProduct(slug);
         if (cancelled) return;
+        if (!p?._id) throw new Error('Product not found');
         setProduct(p);
-        setSize(p.sizes?.[0] || '');
+        setSize(
+          p.sizes?.includes(requestedSize)
+            ? requestedSize
+            : p.sizes?.[0] || '',
+        );
         setColor(p.colors?.[0] || null);
         setActiveImg(0);
         setLoadedSlug(slug);
 
+        if (p.isDemo) {
+          setRelated(
+            DEMO_PRODUCTS.filter(
+              (item) => item.category === p.category && item.slug !== p.slug,
+            ).slice(0, 4),
+          );
+          return;
+        }
+
         try {
           const rel = await api.get(`/products?limit=4&category=${p.category}`);
           if (!cancelled) {
-            setRelated((rel.data.products || []).filter((x) => x.slug !== p.slug).slice(0, 4));
+            const relatedProducts = (rel.data.products || [])
+              .filter((item) => item.slug !== p.slug)
+              .slice(0, 4);
+            setRelated(
+              relatedProducts.length
+                ? relatedProducts
+                : DEMO_PRODUCTS.filter(
+                    (item) => item.category === p.category && item.slug !== p.slug,
+                  ).slice(0, 4),
+            );
           }
         } catch {
-          if (!cancelled) setRelated([]);
+          if (!cancelled) {
+            setRelated(
+              DEMO_PRODUCTS.filter(
+                (item) => item.category === p.category && item.slug !== p.slug,
+              ).slice(0, 4),
+            );
+          }
         }
       } catch (requestError) {
         if (cancelled) return;
-        setProduct(null);
-        setError(
-          requestError.response?.status === 404
-            ? 'Product not found.'
-            : 'Could not load this product. Please try again.',
-        );
+        const demoProduct = getDemoProduct(slug);
+        if (demoProduct) {
+          setProduct(demoProduct);
+          setSize(
+            demoProduct.sizes?.includes(requestedSize)
+              ? requestedSize
+              : demoProduct.sizes?.[0] || '',
+          );
+          setColor(demoProduct.colors?.[0] || null);
+          setActiveImg(0);
+          setRelated(
+            DEMO_PRODUCTS.filter(
+              (item) =>
+                item.category === demoProduct.category &&
+                item.slug !== demoProduct.slug,
+            ).slice(0, 4),
+          );
+          setError('');
+        } else {
+          setProduct(null);
+          setError(
+            requestError.response?.status === 404
+              ? 'Product not found.'
+              : 'Could not load this product. Please try again.',
+          );
+        }
         setLoadedSlug(slug);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, requestedSize]);
 
   if (loading) {
     return (
@@ -93,7 +145,7 @@ export default function ProductDetail() {
     setAdding(true);
     try {
       const success = await addItem({
-        productId: product._id,
+        productId: product._id || product.slug,
         product,
         quantity: qty,
         size,
